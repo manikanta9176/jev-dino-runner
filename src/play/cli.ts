@@ -39,10 +39,10 @@ const summary = await play({
   policy,
   seed,
   seconds,
-  onDecision: (decision, frame) => {
+  onDecision: (event) => {
     const confidence =
-      decision.confidence === null ? "" : ` confidence=${decision.confidence.toFixed(2)}`;
-    console.log(`frame ${frame}  ${decision.action}${confidence}  ${decision.note}`);
+      event.confidence === null ? "" : ` confidence=${event.confidence.toFixed(2)}`;
+    console.log(`frame ${event.frame}  ${event.action}${confidence}  ${event.note}`);
   },
 });
 

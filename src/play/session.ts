@@ -52,7 +52,7 @@ export interface PlayOptions {
   seed: number;
   seconds: number;
   onFrame?: (event: FrameEvent) => void;
-  onDecision?: (decision: Decision, frame: number) => void;
+  onDecision?: (event: DecisionEvent) => void;
   frameStride?: number;
 }
 
@@ -114,7 +114,7 @@ export async function play(options: PlayOptions): Promise<PlaySummary> {
       } else if (threat && framesUntilContact(world, threat) <= REACT_FRAMES) {
         const decision = await options.policy.choose(world);
         lastDecision = decision;
-        history.push({
+        const event: DecisionEvent = {
           frame: world.frame,
           action: decision.action,
           confidence: decision.confidence,
@@ -124,8 +124,9 @@ export async function play(options: PlayOptions): Promise<PlaySummary> {
           obstacle: threat
             ? { id: threat.id, kind: threat.kind, lane: threat.lane }
             : null,
-        });
-        options.onDecision?.(decision, world.frame);
+        };
+        history.push(event);
+        options.onDecision?.(event);
         decisions += 1;
         actions[decision.action] += 1;
         if (decision.model) model = decision.model;

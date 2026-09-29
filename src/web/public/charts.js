@@ -81,6 +81,10 @@ export function renderActionDonut(container, actions) {
 export function renderConfidenceChart(container, history) {
   const known = history.filter((row) => typeof row.confidence === "number");
   container.replaceChildren();
+  if (history.length === 0) {
+    cardMessage(container, "Waiting for the first decision.");
+    return;
+  }
   if (known.length === 0) {
     cardMessage(container, "This policy does not report confidence.");
     return;
@@ -136,6 +140,10 @@ export function renderConfidenceChart(container, history) {
 export function renderProbabilityChart(container, history) {
   const rows = history.filter((row) => row.probabilities);
   container.replaceChildren();
+  if (history.length === 0) {
+    cardMessage(container, "Waiting for the first decision.");
+    return;
+  }
   if (rows.length === 0) {
     cardMessage(container, "This policy does not report probabilities.");
     return;
@@ -172,6 +180,10 @@ export function renderObstacleChart(container, history) {
   }
   const entries = [...counts.entries()].sort((a, b) => b[1] - a[1]);
   container.replaceChildren();
+  if (history.length === 0) {
+    cardMessage(container, "Waiting for the first decision.");
+    return;
+  }
   if (entries.length === 0) {
     cardMessage(container, "No obstacles were judged.");
     return;

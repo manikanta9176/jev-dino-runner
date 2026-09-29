@@ -184,6 +184,37 @@ canvas {
   background: #2f6b45;
 }
 
+.live {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  border: 2px solid #1c1915;
+  background: #f7f3ea;
+  margin-top: 12px;
+}
+
+.live div {
+  padding: 10px 12px;
+  min-width: 0;
+}
+
+.live div + div {
+  border-left: 2px solid #1c1915;
+}
+
+.live span {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.live strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 20px;
+}
+
 #status,
 #reason {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -396,8 +427,17 @@ tr.run td:nth-child(3) {
   }
 
   #limits,
-  .stats {
+  .stats,
+  .live {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .live div:nth-child(n + 3) {
+    border-top: 2px solid #1c1915;
+  }
+
+  .live div:nth-child(odd) {
+    border-left: 0;
   }
 
   .charts {

@@ -25,13 +25,40 @@ const policyChoice = document.querySelector("#policy-choice");
 const secondsInput = document.querySelector("#seconds");
 const seedInput = document.querySelector("#seed");
 const analysis = document.querySelector("#analysis");
+const analysisTitle = document.querySelector("#analysis-title");
 const facts = document.querySelector("#facts");
 const analysisRows = document.querySelector("#analysis-rows");
 const meter = document.querySelector("#meter");
+const livePanel = document.querySelector("#live");
+const liveFrame = document.querySelector("#live-frame");
+const liveSpeed = document.querySelector("#live-speed");
+const liveDecisions = document.querySelector("#live-decisions");
+const liveJump = document.querySelector("#live-jump");
+const liveDuck = document.querySelector("#live-duck");
+const liveRun = document.querySelector("#live-run");
 
 let latest = null;
 let policyName = "—";
 const queue = [];
+let live = emptyLive();
+
+function emptyLive() {
+  return {
+    playing: false,
+    survived: false,
+    score: 0,
+    frames: 0,
+    seconds: Number(secondsInput.value) || 20,
+    seed: Number(seedInput.value) || 7,
+    policy: policyChoice.value,
+    model: null,
+    decisions: 0,
+    actions: { jump: 0, duck: 0, run: 0 },
+    hit: null,
+    history: [],
+    error: null,
+  };
+}
 
 function drawGround(frame) {
   ctx.strokeStyle = "#1c1915";
@@ -98,7 +125,11 @@ function render() {
 
 function applyFrame(frame) {
   latest = frame;
+  live.score = frame.score;
+  live.frames = frame.frame;
   scoreEl.textContent = String(frame.score);
+  liveFrame.textContent = String(frame.frame);
+  liveSpeed.textContent = String(frame.speed);
   if (!frame.alive) statusEl.textContent = `Crashed at score ${frame.score}.`;
 }
 
@@ -115,14 +146,23 @@ function enqueue(item) {
   queue.push(item);
 }
 
-function showDecision(frameNumber, decision) {
+function showDecision(decision) {
+  live.history.push(decision);
+  live.actions[decision.action] += 1;
+  live.decisions += 1;
+  if (decision.model) live.model = decision.model;
   actionEl.textContent = decision.action;
   confidenceEl.textContent = decision.confidence === null ? "—" : decision.confidence.toFixed(2);
+  liveDecisions.textContent = String(live.decisions);
+  liveJump.textContent = String(live.actions.jump);
+  liveDuck.textContent = String(live.actions.duck);
+  liveRun.textContent = String(live.actions.run);
   showMeter(decision.probabilities);
   const probabilities = decision.probabilities
     ? `  jump ${pct(decision.probabilities.jump)}  duck ${pct(decision.probabilities.duck)}  run ${pct(decision.probabilities.run)}`
     : "";
-  reasonEl.textContent = `f${frameNumber}  ${decision.action}${probabilities}${decision.note ? `  ${decision.note}` : ""}`;
+  reasonEl.textContent = `f${decision.frame}  ${decision.action}${probabilities}${decision.note ? `  ${decision.note}` : ""}`;
+  paint(live);
 }
 
 function setFormLocked(locked) {
@@ -142,7 +182,8 @@ function fact(label, value) {
   return cell;
 }
 
-function renderAnalysis(summary) {
+function paint(summary) {
+  analysisTitle.textContent = summary.playing ? "Live decisions" : "How this run was played";
   const confidences = summary.history
     .map((row) => row.confidence)
     .filter((value) => typeof value === "number");
@@ -150,7 +191,7 @@ function renderAnalysis(summary) {
     confidences.length === 0
       ? "—"
       : (confidences.reduce((total, value) => total + value, 0) / confidences.length).toFixed(2);
-  const ending = summary.survived ? "Survived" : "Crashed";
+  const ending = summary.playing ? "Playing" : summary.survived ? "Survived" : "Crashed";
   const crash = summary.hit ? `${summary.hit.lane} ${summary.hit.kind}` : "—";
 
   facts.replaceChildren(
@@ -194,14 +235,14 @@ function renderAnalysis(summary) {
     analysisRows.append(tr);
   }
   analysis.hidden = false;
-  analysis.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function finish(summary) {
   const ending = summary.survived ? "Survived the run." : "The run ended.";
   const detail = summary.error ? ` ${summary.error}` : "";
   statusEl.textContent = `${ending} Score ${summary.score}. ${summary.decisions} decisions.${detail}`;
-  renderAnalysis(summary);
+  live = { ...summary, playing: false };
+  paint(live);
   setFormLocked(false);
 }
 
@@ -226,7 +267,19 @@ events.addEventListener("message", (event) => {
     statusEl.textContent = message.message;
     reasonEl.textContent = "";
     showMeter(null);
-    analysis.hidden = true;
+    live = emptyLive();
+    live.playing = true;
+    live.policy = message.policy ?? live.policy;
+    live.seconds = message.seconds ?? live.seconds;
+    live.seed = message.seed ?? live.seed;
+    liveFrame.textContent = "0";
+    liveSpeed.textContent = "0";
+    liveDecisions.textContent = "0";
+    liveJump.textContent = "0";
+    liveDuck.textContent = "0";
+    liveRun.textContent = "0";
+    livePanel.hidden = false;
+    paint(live);
     return;
   }
   if (message.type === "error") {
@@ -242,7 +295,7 @@ function playback() {
   const message = queue.shift();
   if (!message) return;
   if (message.type === "frame") applyFrame(message.frame);
-  if (message.type === "decision") showDecision(message.frame, message.decision);
+  if (message.type === "decision") showDecision(message.decision);
   if (message.type === "done") finish(message.summary);
   render();
 }
@@ -271,6 +324,7 @@ form.addEventListener("submit", async (event) => {
   reasonEl.textContent = "";
   showMeter(null);
   statusEl.textContent = "Starting…";
+  livePanel.hidden = true;
   analysis.hidden = true;
 
   const response = await fetch("/api/play", {

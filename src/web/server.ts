@@ -121,9 +121,9 @@ async function startRun(settings: PlayRequest) {
       seed,
       seconds,
       frameStride: 2,
-      onDecision: (decision, frame) => {
+      onDecision: (event) => {
         if (token !== generation) return;
-        broadcast({ type: "decision", frame, decision });
+        broadcast({ type: "decision", decision: event });
       },
       onFrame: (frame: FrameEvent) => {
         if (token !== generation) return;

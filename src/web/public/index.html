@@ -63,9 +63,17 @@
 
       <p id="status">Set the limits, then press Play. A decision is made each time an obstacle gets close.</p>
       <p id="reason"></p>
+      <section id="live" class="live" hidden>
+        <div><span>Frame</span><strong id="live-frame">0</strong></div>
+        <div><span>Speed</span><strong id="live-speed">0</strong></div>
+        <div><span>Decisions</span><strong id="live-decisions">0</strong></div>
+        <div><span>Jump</span><strong id="live-jump">0</strong></div>
+        <div><span>Duck</span><strong id="live-duck">0</strong></div>
+        <div><span>Run</span><strong id="live-run">0</strong></div>
+      </section>
 
       <section id="analysis" hidden>
-        <h2>How this run was played</h2>
+        <h2 id="analysis-title">Live decisions</h2>
         <div id="facts" class="facts"></div>
         <div class="charts">
           <article class="chart-card">
