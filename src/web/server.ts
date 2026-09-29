@@ -16,6 +16,7 @@ const files: Record<string, string> = {
   "/index.html": "index.html",
   "/styles.css": "styles.css",
   "/main.js": "main.js",
+  "/charts.js": "charts.js",
 };
 
 const types: Record<string, string> = {

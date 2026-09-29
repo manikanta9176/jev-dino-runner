@@ -1,3 +1,10 @@
+import {
+  renderActionDonut,
+  renderConfidenceChart,
+  renderObstacleChart,
+  renderProbabilityChart,
+} from "./charts.js";
+
 const GROUND_Y = 188;
 const DINO_X = 56;
 const DINO_W = 40;
@@ -11,7 +18,7 @@ const policyEl = document.querySelector("#policy");
 const actionEl = document.querySelector("#action");
 const confidenceEl = document.querySelector("#confidence");
 const statusEl = document.querySelector("#status");
-const logEl = document.querySelector("#log");
+const reasonEl = document.querySelector("#reason");
 const playButton = document.querySelector("#play");
 const form = document.querySelector("#limits");
 const policyChoice = document.querySelector("#policy-choice");
@@ -20,12 +27,13 @@ const seedInput = document.querySelector("#seed");
 const analysis = document.querySelector("#analysis");
 const facts = document.querySelector("#facts");
 const analysisRows = document.querySelector("#analysis-rows");
+const meter = document.querySelector("#meter");
 
 let latest = null;
 let policyName = "—";
 const queue = [];
 
-function drawGround() {
+function drawGround(frame) {
   ctx.strokeStyle = "#1c1915";
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -33,10 +41,17 @@ function drawGround() {
   ctx.lineTo(canvas.width, GROUND_Y + 1);
   ctx.stroke();
 
+  const shift = frame ? Math.floor(frame * 2) % 28 : 0;
   ctx.fillStyle = "#d8c7a5";
-  for (let x = 0; x < canvas.width; x += 28) {
-    ctx.fillRect(x, GROUND_Y + 8, 12, 2);
+  for (let x = -shift; x < canvas.width; x += 28) {
+    ctx.fillRect(x, GROUND_Y + 10, 14, 2);
   }
+}
+
+function drawCloud(x, y) {
+  ctx.fillStyle = "#e7e0d2";
+  ctx.fillRect(x, y, 36, 8);
+  ctx.fillRect(x + 8, y - 6, 16, 6);
 }
 
 function drawDino(frame) {
@@ -44,21 +59,35 @@ function drawDino(frame) {
   const bottom = GROUND_Y - frame.altitude;
   const y = bottom - height;
   ctx.fillStyle = "#1c1915";
+  ctx.fillRect(DINO_X + 4, y + height - 8, 8, 6);
   ctx.fillRect(DINO_X, y, DINO_W, height);
+  if (!frame.ducking) ctx.fillRect(DINO_X - 8, y + 16, 8, 6);
   ctx.fillStyle = "#f7f3ea";
   ctx.fillRect(DINO_X + 26, y + 8, 6, 6);
 }
 
 function drawObstacle(obstacle) {
-  ctx.fillStyle = obstacle.kind === "bird" ? "#8c4a2f" : "#2f6b45";
-  ctx.fillRect(obstacle.x, obstacle.y, obstacle.w, obstacle.h);
+  if (obstacle.kind === "bird") {
+    ctx.fillStyle = "#8c4a2f";
+    ctx.fillRect(obstacle.x + 8, obstacle.y + 4, obstacle.w - 16, obstacle.h - 6);
+    ctx.fillRect(obstacle.x, obstacle.y, 14, 6);
+    ctx.fillRect(obstacle.x + obstacle.w - 14, obstacle.y, 14, 6);
+    return;
+  }
+  ctx.fillStyle = "#2f6b45";
+  ctx.fillRect(obstacle.x + 6, obstacle.y, obstacle.w - 12, obstacle.h);
+  ctx.fillRect(obstacle.x, obstacle.y + 10, 8, 6);
+  ctx.fillRect(obstacle.x + obstacle.w - 8, obstacle.y + 16, 8, 6);
 }
 
 function render() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = "#f7f3ea";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  drawGround();
+  const scroll = latest ? latest.frame : 0;
+  drawCloud(80 - (scroll % 400), 36);
+  drawCloud(280 - (scroll % 520), 58);
+  drawCloud(520 - (scroll % 460), 28);
+  drawGround(scroll);
   if (!latest) {
     drawDino({ altitude: 0, ducking: false });
     return;
@@ -73,11 +102,13 @@ function applyFrame(frame) {
   if (!frame.alive) statusEl.textContent = `Crashed at score ${frame.score}.`;
 }
 
-function pushLog(text) {
-  const item = document.createElement("li");
-  item.textContent = text;
-  logEl.prepend(item);
-  while (logEl.children.length > 8) logEl.lastChild.remove();
+function showMeter(probabilities) {
+  for (const key of ["jump", "duck", "run"]) {
+    const segment = meter.querySelector(`[data-action="${key}"]`);
+    const value = probabilities?.[key];
+    segment.style.flexGrow = typeof value === "number" ? String(Math.max(value, 0)) : "1";
+    segment.style.opacity = typeof value === "number" ? "1" : "0.2";
+  }
 }
 
 function enqueue(item) {
@@ -87,10 +118,11 @@ function enqueue(item) {
 function showDecision(frameNumber, decision) {
   actionEl.textContent = decision.action;
   confidenceEl.textContent = decision.confidence === null ? "—" : decision.confidence.toFixed(2);
+  showMeter(decision.probabilities);
   const probabilities = decision.probabilities
     ? `  jump ${pct(decision.probabilities.jump)}  duck ${pct(decision.probabilities.duck)}  run ${pct(decision.probabilities.run)}`
     : "";
-  pushLog(`f${frameNumber}  ${decision.action}${probabilities}`);
+  reasonEl.textContent = `f${frameNumber}  ${decision.action}${probabilities}${decision.note ? `  ${decision.note}` : ""}`;
 }
 
 function setFormLocked(locked) {
@@ -130,16 +162,19 @@ function renderAnalysis(summary) {
     fact("Policy", summary.policy),
     fact("Model", summary.model ?? "—"),
     fact("Decisions", String(summary.decisions)),
-    fact("Jump", String(summary.actions.jump)),
-    fact("Duck", String(summary.actions.duck)),
-    fact("Run", String(summary.actions.run)),
     fact("Avg confidence", average),
     fact("Hit", crash),
   );
 
+  renderActionDonut(document.querySelector("#chart-actions"), summary.actions);
+  renderConfidenceChart(document.querySelector("#chart-confidence"), summary.history);
+  renderObstacleChart(document.querySelector("#chart-obstacles"), summary.history);
+  renderProbabilityChart(document.querySelector("#chart-probabilities"), summary.history);
+
   analysisRows.replaceChildren();
   for (const row of summary.history) {
     const tr = document.createElement("tr");
+    tr.className = row.action;
     const obstacle = row.obstacle ? `${row.obstacle.lane} ${row.obstacle.kind}` : "—";
     const cells = [
       String(row.frame),
@@ -159,12 +194,13 @@ function renderAnalysis(summary) {
     analysisRows.append(tr);
   }
   analysis.hidden = false;
+  analysis.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function finish(summary) {
   const ending = summary.survived ? "Survived the run." : "The run ended.";
   const detail = summary.error ? ` ${summary.error}` : "";
-  statusEl.textContent = `${ending} Score ${summary.score}. Decisions ${summary.decisions}. The table below is every choice in order.${detail}`;
+  statusEl.textContent = `${ending} Score ${summary.score}. ${summary.decisions} decisions.${detail}`;
   renderAnalysis(summary);
   setFormLocked(false);
 }
@@ -188,7 +224,8 @@ events.addEventListener("message", (event) => {
     policyName = message.policy;
     policyEl.textContent = policyName;
     statusEl.textContent = message.message;
-    logEl.replaceChildren();
+    reasonEl.textContent = "";
+    showMeter(null);
     analysis.hidden = true;
     return;
   }
@@ -231,6 +268,8 @@ form.addEventListener("submit", async (event) => {
   setFormLocked(true);
   actionEl.textContent = "run";
   confidenceEl.textContent = "—";
+  reasonEl.textContent = "";
+  showMeter(null);
   statusEl.textContent = "Starting…";
   analysis.hidden = true;
 

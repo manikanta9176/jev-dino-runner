@@ -25,11 +25,11 @@
         </label>
         <label>
           Seconds
-          <input id="seconds" name="seconds" type="number" min="1" max="120" value="20" required />
+          <input id="seconds" name="seconds" type="number" min="1" max="120" step="1" value="20" required />
         </label>
         <label>
           Seed
-          <input id="seed" name="seed" type="number" min="0" max="1000000" value="7" required />
+          <input id="seed" name="seed" type="number" min="0" max="1000000" step="1" value="7" required />
         </label>
         <button id="play" type="submit">Play</button>
       </form>
@@ -54,13 +54,37 @@
           <strong id="confidence">—</strong>
         </div>
       </section>
+      <div class="meter" id="meter" aria-hidden="true">
+        <span data-action="jump"></span>
+        <span data-action="duck"></span>
+        <span data-action="run"></span>
+      </div>
+      <p class="meter-key"><i class="swatch jump"></i> jump <i class="swatch duck"></i> duck <i class="swatch run"></i> run</p>
 
       <p id="status">Set the limits, then press Play. A decision is made each time an obstacle gets close.</p>
-      <ul id="log"></ul>
+      <p id="reason"></p>
 
       <section id="analysis" hidden>
         <h2>How this run was played</h2>
         <div id="facts" class="facts"></div>
+        <div class="charts">
+          <article class="chart-card">
+            <h3>Action mix</h3>
+            <div id="chart-actions"></div>
+          </article>
+          <article class="chart-card">
+            <h3>Confidence</h3>
+            <div id="chart-confidence"></div>
+          </article>
+          <article class="chart-card">
+            <h3>Obstacles judged</h3>
+            <div id="chart-obstacles"></div>
+          </article>
+          <article class="chart-card">
+            <h3>Choice probabilities</h3>
+            <div id="chart-probabilities"></div>
+          </article>
+        </div>
         <div class="table-wrap">
           <table>
             <thead>
