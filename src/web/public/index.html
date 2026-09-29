@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Jev dino runner</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <p class="eyebrow">TypeSafe Jev</p>
+          <h1>Dino runner</h1>
+        </div>
+        <button id="play" type="button">Play</button>
+      </header>
+
+      <canvas id="field" width="800" height="240"></canvas>
+
+      <section class="stats" aria-live="polite">
+        <div>
+          <span>Score</span>
+          <strong id="score">0</strong>
+        </div>
+        <div>
+          <span>Policy</span>
+          <strong id="policy">—</strong>
+        </div>
+        <div>
+          <span>Action</span>
+          <strong id="action">run</strong>
+        </div>
+        <div>
+          <span>Confidence</span>
+          <strong id="confidence">—</strong>
+        </div>
+      </section>
+
+      <p id="status">Press Play. Jev is asked each time an obstacle enters the reaction window.</p>
+      <ul id="log"></ul>
+    </main>
+    <script src="/main.js" type="module"></script>
+  </body>
+</html>
