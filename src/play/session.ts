@@ -21,6 +21,16 @@ export interface FrameEvent {
   hitObstacleId: number | null;
 }
 
+export interface DecisionEvent {
+  frame: number;
+  action: Action;
+  confidence: number | null;
+  probabilities: Decision["probabilities"];
+  model: string | null;
+  note: string;
+  obstacle: { id: number; kind: Obstacle["kind"]; lane: Obstacle["lane"] } | null;
+}
+
 export interface PlaySummary {
   policy: string;
   seed: number;
@@ -32,6 +42,8 @@ export interface PlaySummary {
   model: string | null;
   actions: Record<Action, number>;
   hitObstacleId: number | null;
+  hit: { id: number; kind: Obstacle["kind"]; lane: Obstacle["lane"] } | null;
+  history: DecisionEvent[];
   error: string | null;
 }
 
@@ -76,6 +88,7 @@ export async function play(options: PlayOptions): Promise<PlaySummary> {
   let error: string | null = null;
   let committed: { id: number; action: Action; jumped: boolean } | null = null;
   let lastDecision: Decision | null = null;
+  const history: DecisionEvent[] = [];
 
   const emit = (force: boolean) => {
     if (!options.onFrame) return;
@@ -101,6 +114,17 @@ export async function play(options: PlayOptions): Promise<PlaySummary> {
       } else if (threat && framesUntilContact(world, threat) <= REACT_FRAMES) {
         const decision = await options.policy.choose(world);
         lastDecision = decision;
+        history.push({
+          frame: world.frame,
+          action: decision.action,
+          confidence: decision.confidence,
+          probabilities: decision.probabilities,
+          model: decision.model,
+          note: decision.note,
+          obstacle: threat
+            ? { id: threat.id, kind: threat.kind, lane: threat.lane }
+            : null,
+        });
         options.onDecision?.(decision, world.frame);
         decisions += 1;
         actions[decision.action] += 1;
@@ -119,6 +143,10 @@ export async function play(options: PlayOptions): Promise<PlaySummary> {
 
   emit(true);
 
+  const hitObstacle = world.hitObstacleId
+    ? world.obstacles.find((obstacle) => obstacle.id === world.hitObstacleId)
+    : undefined;
+
   return {
     policy: options.policy.name,
     seed: options.seed,
@@ -130,6 +158,10 @@ export async function play(options: PlayOptions): Promise<PlaySummary> {
     model,
     actions,
     hitObstacleId: world.hitObstacleId,
+    hit: hitObstacle
+      ? { id: hitObstacle.id, kind: hitObstacle.kind, lane: hitObstacle.lane }
+      : null,
+    history,
     error,
   };
 }

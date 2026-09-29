@@ -13,6 +13,13 @@ const confidenceEl = document.querySelector("#confidence");
 const statusEl = document.querySelector("#status");
 const logEl = document.querySelector("#log");
 const playButton = document.querySelector("#play");
+const form = document.querySelector("#limits");
+const policyChoice = document.querySelector("#policy-choice");
+const secondsInput = document.querySelector("#seconds");
+const seedInput = document.querySelector("#seed");
+const analysis = document.querySelector("#analysis");
+const facts = document.querySelector("#facts");
+const analysisRows = document.querySelector("#analysis-rows");
 
 let latest = null;
 let policyName = "—";
@@ -86,11 +93,80 @@ function showDecision(frameNumber, decision) {
   pushLog(`f${frameNumber}  ${decision.action}${probabilities}`);
 }
 
+function setFormLocked(locked) {
+  playButton.disabled = locked;
+  policyChoice.disabled = locked;
+  secondsInput.disabled = locked;
+  seedInput.disabled = locked;
+}
+
+function fact(label, value) {
+  const cell = document.createElement("div");
+  const name = document.createElement("span");
+  const number = document.createElement("strong");
+  name.textContent = label;
+  number.textContent = value;
+  cell.append(name, number);
+  return cell;
+}
+
+function renderAnalysis(summary) {
+  const confidences = summary.history
+    .map((row) => row.confidence)
+    .filter((value) => typeof value === "number");
+  const average =
+    confidences.length === 0
+      ? "—"
+      : (confidences.reduce((total, value) => total + value, 0) / confidences.length).toFixed(2);
+  const ending = summary.survived ? "Survived" : "Crashed";
+  const crash = summary.hit ? `${summary.hit.lane} ${summary.hit.kind}` : "—";
+
+  facts.replaceChildren(
+    fact("Result", ending),
+    fact("Score", String(summary.score)),
+    fact("Frames", String(summary.frames)),
+    fact("Limit", `${summary.seconds}s`),
+    fact("Seed", String(summary.seed)),
+    fact("Policy", summary.policy),
+    fact("Model", summary.model ?? "—"),
+    fact("Decisions", String(summary.decisions)),
+    fact("Jump", String(summary.actions.jump)),
+    fact("Duck", String(summary.actions.duck)),
+    fact("Run", String(summary.actions.run)),
+    fact("Avg confidence", average),
+    fact("Hit", crash),
+  );
+
+  analysisRows.replaceChildren();
+  for (const row of summary.history) {
+    const tr = document.createElement("tr");
+    const obstacle = row.obstacle ? `${row.obstacle.lane} ${row.obstacle.kind}` : "—";
+    const cells = [
+      String(row.frame),
+      obstacle,
+      row.action,
+      row.confidence === null ? "—" : row.confidence.toFixed(2),
+      pct(row.probabilities?.jump),
+      pct(row.probabilities?.duck),
+      pct(row.probabilities?.run),
+      row.note,
+    ];
+    for (const value of cells) {
+      const td = document.createElement("td");
+      td.textContent = value;
+      tr.append(td);
+    }
+    analysisRows.append(tr);
+  }
+  analysis.hidden = false;
+}
+
 function finish(summary) {
   const ending = summary.survived ? "Survived the run." : "The run ended.";
   const detail = summary.error ? ` ${summary.error}` : "";
-  statusEl.textContent = `${ending} Score ${summary.score}. Decisions ${summary.decisions}.${detail}`;
-  playButton.disabled = false;
+  statusEl.textContent = `${ending} Score ${summary.score}. Decisions ${summary.decisions}. The table below is every choice in order.${detail}`;
+  renderAnalysis(summary);
+  setFormLocked(false);
 }
 
 const events = new EventSource("/events");
@@ -100,9 +176,10 @@ events.addEventListener("message", (event) => {
   if (message.type === "hello") {
     policyName = message.policy;
     policyEl.textContent = policyName;
-    if (!message.hasApiKey && policyName !== "jev") {
+    policyChoice.value = message.policy === "heuristic" ? "heuristic" : "jev";
+    if (!message.hasApiKey) {
       statusEl.textContent =
-        "No TYPESAFE_API_KEY in the environment, so this window uses the local heuristic. Add the key and restart to let Jev play.";
+        "No TYPESAFE_API_KEY in the environment. Choose heuristic, or add the key and restart the server to use Jev.";
     }
     return;
   }
@@ -112,11 +189,12 @@ events.addEventListener("message", (event) => {
     policyEl.textContent = policyName;
     statusEl.textContent = message.message;
     logEl.replaceChildren();
+    analysis.hidden = true;
     return;
   }
   if (message.type === "error") {
     statusEl.textContent = message.message;
-    playButton.disabled = false;
+    setFormLocked(false);
     return;
   }
   enqueue(message);
@@ -137,12 +215,39 @@ function pct(value) {
   return `${Math.round(value * 100)}%`;
 }
 
-playButton.addEventListener("click", async () => {
-  playButton.disabled = true;
+form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const seconds = Number(secondsInput.value);
+  const seed = Number(seedInput.value);
+  if (!Number.isInteger(seconds) || seconds < 1 || seconds > 120) {
+    statusEl.textContent = "Seconds must be a whole number from 1 to 120.";
+    return;
+  }
+  if (!Number.isInteger(seed) || seed < 0 || seed > 1_000_000) {
+    statusEl.textContent = "Seed must be a whole number from 0 to 1000000.";
+    return;
+  }
+
+  setFormLocked(true);
   actionEl.textContent = "run";
   confidenceEl.textContent = "—";
   statusEl.textContent = "Starting…";
-  await fetch("/api/play", { method: "POST" });
+  analysis.hidden = true;
+
+  const response = await fetch("/api/play", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      policy: policyChoice.value,
+      seconds,
+      seed,
+    }),
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({ error: "Could not start the run." }));
+    statusEl.textContent = payload.error ?? "Could not start the run.";
+    setFormLocked(false);
+  }
 });
 
 playback();

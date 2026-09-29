@@ -1,4 +1,4 @@
-import { createServer, type ServerResponse } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -45,24 +45,80 @@ function broadcast(payload: unknown) {
   for (const client of clients) writeEvent(client, payload);
 }
 
-async function startRun(policyName: PolicyName, seed: number) {
+interface PlayRequest {
+  policy: PolicyName;
+  seconds: number;
+  seed: number;
+}
+
+function parsePlayRequest(body: string, fallbackPolicy: PolicyName): PlayRequest | { error: string } {
+  let raw: Record<string, unknown> = {};
+  if (body.trim()) {
+    try {
+      const parsed: unknown = JSON.parse(body);
+      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return { error: "Request body must be a JSON object." };
+      }
+      raw = parsed as Record<string, unknown>;
+    } catch {
+      return { error: "Request body must be JSON." };
+    }
+  }
+
+  const policy = raw.policy ?? fallbackPolicy;
+  if (policy !== "jev" && policy !== "heuristic") {
+    return { error: "Policy must be jev or heuristic." };
+  }
+  const seconds = Number(raw.seconds ?? 20);
+  const seed = Number(raw.seed ?? 7);
+  if (!Number.isInteger(seconds) || seconds < 1 || seconds > 120) {
+    return { error: "Seconds must be a whole number from 1 to 120." };
+  }
+  if (!Number.isInteger(seed) || seed < 0 || seed > 1_000_000) {
+    return { error: "Seed must be a whole number from 0 to 1000000." };
+  }
+  return { policy, seconds, seed };
+}
+
+function readBody(request: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    request.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > 10_000) {
+        reject(new Error("Body too large"));
+        request.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    request.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    request.on("error", reject);
+  });
+}
+
+async function startRun(settings: PlayRequest) {
   const token = ++generation;
   running = true;
+  const { policy: policyName, seed, seconds } = settings;
   const keyNote =
     policyName === "heuristic" && !process.env.TYPESAFE_API_KEY
       ? " TYPESAFE_API_KEY is not set, so this run is the local heuristic instead of Jev."
       : "";
   broadcast({
     type: "status",
-    message: `Playing with ${policyName}.${keyNote}`,
+    message: `Playing with ${policyName} for ${seconds}s, seed ${seed}.${keyNote}`,
     policy: policyName,
+    seconds,
+    seed,
   });
 
   try {
     const summary = await play({
       policy: createPolicy(policyName),
       seed,
-      seconds: 24,
+      seconds,
       frameStride: 2,
       onDecision: (decision, frame) => {
         if (token !== generation) return;
@@ -103,11 +159,20 @@ const server = createServer(async (request, response) => {
   }
 
   if (url.pathname === "/api/play" && request.method === "POST") {
-    const policy = policyFromEnv();
-    const seed = Number(url.searchParams.get("seed") ?? Date.now() % 100000);
-    void startRun(policy, seed);
+    if (running) {
+      response.writeHead(409, { "content-type": "application/json" });
+      response.end(JSON.stringify({ error: "A run is already in progress." }));
+      return;
+    }
+    const parsed = parsePlayRequest(await readBody(request), policyFromEnv());
+    if ("error" in parsed) {
+      response.writeHead(400, { "content-type": "application/json" });
+      response.end(JSON.stringify(parsed));
+      return;
+    }
+    void startRun(parsed);
     response.writeHead(202, { "content-type": "application/json" });
-    response.end(JSON.stringify({ started: true, policy, seed }));
+    response.end(JSON.stringify({ started: true, ...parsed }));
     return;
   }
 

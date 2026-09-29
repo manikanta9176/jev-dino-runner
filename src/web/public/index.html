@@ -13,8 +13,26 @@
           <p class="eyebrow">TypeSafe Jev</p>
           <h1>Dino runner</h1>
         </div>
-        <button id="play" type="button">Play</button>
       </header>
+
+      <form id="limits">
+        <label>
+          Policy
+          <select id="policy-choice" name="policy">
+            <option value="jev">jev</option>
+            <option value="heuristic">heuristic</option>
+          </select>
+        </label>
+        <label>
+          Seconds
+          <input id="seconds" name="seconds" type="number" min="1" max="120" value="20" required />
+        </label>
+        <label>
+          Seed
+          <input id="seed" name="seed" type="number" min="0" max="1000000" value="7" required />
+        </label>
+        <button id="play" type="submit">Play</button>
+      </form>
 
       <canvas id="field" width="800" height="240"></canvas>
 
@@ -37,8 +55,30 @@
         </div>
       </section>
 
-      <p id="status">Press Play. Jev is asked each time an obstacle enters the reaction window.</p>
+      <p id="status">Set the limits, then press Play. A decision is made each time an obstacle gets close.</p>
       <ul id="log"></ul>
+
+      <section id="analysis" hidden>
+        <h2>How this run was played</h2>
+        <div id="facts" class="facts"></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Frame</th>
+                <th>Obstacle</th>
+                <th>Action</th>
+                <th>Confidence</th>
+                <th>Jump</th>
+                <th>Duck</th>
+                <th>Run</th>
+                <th>Why</th>
+              </tr>
+            </thead>
+            <tbody id="analysis-rows"></tbody>
+          </table>
+        </div>
+      </section>
     </main>
     <script src="/main.js" type="module"></script>
   </body>
