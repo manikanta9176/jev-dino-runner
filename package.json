@@ -4,6 +4,7 @@
   "private": true,
   "description": "A dinosaur runner played by decisions from the TypeSafe Jev SDK.",
   "type": "module",
+  "packageManager": "pnpm@10.28.1",
   "engines": {
     "node": ">=20"
   },
@@ -19,5 +20,8 @@
     "@types/node": "^24.5.2",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
   }
 }

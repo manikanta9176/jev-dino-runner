@@ -20,12 +20,12 @@ The browser never sees the API key. It draws frames that the server streams over
 ## Run
 
 ```bash
-npm install
+pnpm install
 cp .env.example .env
 # put a key from https://console.typesafe.ai/settings/keys in .env
 
-npm run play -- --policy jev --seconds 20 --seed 7
-npm run watch
+pnpm play -- --policy jev --seconds 20 --seed 7
+pnpm watch
 ```
 
 Open http://127.0.0.1:4173 and press Play.
@@ -33,5 +33,5 @@ Open http://127.0.0.1:4173 and press Play.
 Without `TYPESAFE_API_KEY`, the watch page falls back to `--policy heuristic`, a local rule that uses the same forecasts. The CLI stays on Jev unless you pass `--policy heuristic`.
 
 ```bash
-npm run play -- --policy heuristic --seconds 20 --seed 7
+pnpm play -- --policy heuristic --seconds 20 --seed 7
 ```
