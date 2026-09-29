@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "dflow": {
+      "url": "https://app.staging.dflow.sh/api/mcp"
+    }
+  }
+}
