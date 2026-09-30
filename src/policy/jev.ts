@@ -1,16 +1,19 @@
 import { choice, TypeSafeClient } from "@typesafe-ai/sdk";
-import { DINO_W, DINO_X, DUCK_H, GROUND_Y, STAND_H } from "../game/constants.ts";
+import { DINO_W, DINO_X, DUCK_H, STAND_H } from "../game/constants.ts";
 import { nearestObstacle } from "../game/engine.ts";
 import type { Action, World } from "../game/types.ts";
 import type { Decision, Policy } from "./types.ts";
 
 const ACTIONS = ["jump", "duck", "run"] as const satisfies readonly Action[];
 
-/** Fixed meanings of the actions. These do not say which one is safe right now. */
+/**
+ * What each action is for. These describe kinds of obstacles, not the result of a simulation.
+ * Jev matches `nextObstacle` to one of these descriptions.
+ */
 const ACTION_CRITERIA = {
-  run: "Keep the current path. Stay standing when on the ground. Do not jump and do not crouch.",
-  duck: "Crouch on the ground so the body becomes shorter. This does not leave the ground.",
-  jump: "Leap upward if currently on the ground. The body leaves the ground and stays in the air for a short time.",
+  run: "The next obstacle is a high bird, above a standing dinosaur. Staying on the current path goes under it. Also choose this when no obstacle is close.",
+  duck: "The next obstacle is a low bird. A standing dinosaur meets it. Crouching goes under it.",
+  jump: "The next obstacle is a cactus on the ground. A standing or crouching dinosaur meets it. A jump goes over it.",
 } as const;
 
 function round(value: number): number {
@@ -34,12 +37,8 @@ export class JevPolicy implements Policy {
     const dinoRight = DINO_X + DINO_W;
     const state = {
       game: "dinosaur runner",
-      space: "X increases to the right. Y increases downward. Altitude is pixels above the ground.",
-      groundY: GROUND_Y,
       speedPxPerFrame: round(world.speed),
       dinosaur: {
-        frontX: dinoRight,
-        width: DINO_W,
         standingHeight: STAND_H,
         crouchingHeight: DUCK_H,
         altitudePx: round(world.dino.altitude),
@@ -49,12 +48,8 @@ export class JevPolicy implements Policy {
       nextObstacle: threat
         ? {
             kind: threat.kind,
-            leftX: Math.round(threat.x),
-            topY: threat.y,
-            width: threat.w,
-            height: threat.h,
-            bottomY: threat.y + threat.h,
-            pixelsAheadOfDinosaur: Math.round(threat.x - dinoRight),
+            lane: threat.lane,
+            pixelsAhead: Math.round(threat.x - dinoRight),
           }
         : null,
     };
@@ -63,7 +58,7 @@ export class JevPolicy implements Policy {
       state,
       questions: {
         action: choice(
-          "Which action should the dinosaur take on this frame so its body does not overlap the next obstacle?",
+          "Which action fits `nextObstacle`? Match its kind and lane to the option descriptions.",
           ACTION_CRITERIA,
         ),
       },
