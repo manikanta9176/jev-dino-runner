@@ -12,6 +12,12 @@
       "sourceType": "github",
       "skillPath": "skills/dflow-mcp/SKILL.md",
       "computedHash": "a84f49d756c3f1a00f5c37d9c92701f97314aa71c6faa534d43e6adda73a6623"
+    },
+    "typesafe-ai": {
+      "source": "typesafe-ai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/typesafe-ai/SKILL.md",
+      "computedHash": "9cd84c5e535dec8dec59917c110f9c00b4a61faadb86b432ec7e41051170af12"
     }
   }
 }
