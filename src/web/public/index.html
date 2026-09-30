@@ -34,41 +34,56 @@
           <input id="seconds" name="seconds" type="number" min="1" max="120" step="1" value="20" required />
         </label>
         <label>
+          Versus
+          <select id="versus-choice" name="versus">
+            <option value="">none</option>
+            <option value="jev">jev</option>
+            <option value="laya">laya</option>
+            <option value="heuristic">heuristic</option>
+          </select>
+        </label>
+        <label>
           Seed
           <input id="seed" name="seed" type="number" min="0" max="1000000" step="1" value="7" required />
         </label>
         <button id="play" type="submit">Play</button>
       </form>
 
-      <canvas id="field" width="800" height="240"></canvas>
-
-      <section class="stats" aria-live="polite">
-        <div>
-          <span>Score</span>
-          <strong id="score">0</strong>
-        </div>
-        <div>
-          <span>Policy</span>
-          <strong id="policy">—</strong>
-        </div>
-        <div>
-          <span>Action</span>
-          <strong id="action">run</strong>
-        </div>
-        <div>
-          <span>Confidence</span>
-          <strong id="confidence">—</strong>
-        </div>
-      </section>
-      <div class="meter" id="meter" aria-hidden="true">
-        <span data-action="jump"></span>
-        <span data-action="duck"></span>
-        <span data-action="run"></span>
+      <div id="boards" class="boards">
+        <article class="board" id="board-a">
+          <h2 id="board-title-a">Player</h2>
+          <canvas id="field-a" width="800" height="240"></canvas>
+          <section class="stats" aria-live="polite">
+            <div><span>Score</span><strong id="score-a">0</strong></div>
+            <div><span>Action</span><strong id="action-a">run</strong></div>
+            <div><span>Confidence</span><strong id="confidence-a">—</strong></div>
+          </section>
+          <div class="meter" id="meter-a" aria-hidden="true">
+            <span data-action="jump"></span>
+            <span data-action="duck"></span>
+            <span data-action="run"></span>
+          </div>
+          <p class="lane-reason" id="reason-a"></p>
+        </article>
+        <article class="board" id="board-b" hidden>
+          <h2 id="board-title-b">Player</h2>
+          <canvas id="field-b" width="800" height="240"></canvas>
+          <section class="stats" aria-live="polite">
+            <div><span>Score</span><strong id="score-b">0</strong></div>
+            <div><span>Action</span><strong id="action-b">run</strong></div>
+            <div><span>Confidence</span><strong id="confidence-b">—</strong></div>
+          </section>
+          <div class="meter" id="meter-b" aria-hidden="true">
+            <span data-action="jump"></span>
+            <span data-action="duck"></span>
+            <span data-action="run"></span>
+          </div>
+          <p class="lane-reason" id="reason-b"></p>
+        </article>
       </div>
       <p class="meter-key"><i class="swatch jump"></i> jump <i class="swatch duck"></i> duck <i class="swatch run"></i> run</p>
 
       <p id="status">Set the limits, then press Play. A decision is made each time an obstacle gets close.</p>
-      <p id="reason"></p>
       <section id="live" class="live" hidden>
         <div><span>Frame</span><strong id="live-frame">0</strong></div>
         <div><span>Speed</span><strong id="live-speed">0</strong></div>
@@ -76,6 +91,24 @@
         <div><span>Jump</span><strong id="live-jump">0</strong></div>
         <div><span>Duck</span><strong id="live-duck">0</strong></div>
         <div><span>Run</span><strong id="live-run">0</strong></div>
+      </section>
+
+      <section id="match" hidden>
+        <h2>Same course</h2>
+        <p id="match-summary"></p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Obstacle</th>
+                <th id="match-head-a">Left</th>
+                <th id="match-head-b">Right</th>
+                <th>Agree</th>
+              </tr>
+            </thead>
+            <tbody id="match-rows"></tbody>
+          </table>
+        </div>
       </section>
 
       <section id="analysis" hidden>

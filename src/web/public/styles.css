@@ -8,6 +8,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
 }
@@ -62,7 +66,7 @@ button:disabled {
 
 #limits {
   display: grid;
-  grid-template-columns: 1.4fr 0.8fr 0.8fr auto;
+  grid-template-columns: 1.1fr 0.7fr 1.1fr 0.7fr auto;
   gap: 12px;
   align-items: end;
   margin-bottom: 16px;
@@ -89,6 +93,47 @@ select {
   min-height: 42px;
 }
 
+.boards {
+  display: grid;
+  gap: 16px;
+}
+
+.boards.compare {
+  grid-template-columns: 1fr 1fr;
+}
+
+.board h2 {
+  margin: 0 0 8px;
+  font-size: 22px;
+}
+
+.lane-reason {
+  min-height: 2.8em;
+  margin: 8px 0 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+#match {
+  margin-top: 20px;
+}
+
+#match h2 {
+  margin: 0 0 8px;
+  font-size: 28px;
+}
+
+#match-summary {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+
+tr.differ td:last-child {
+  color: #8c2f2f;
+  font-weight: 700;
+}
+
 canvas {
   width: 100%;
   height: auto;
@@ -99,7 +144,7 @@ canvas {
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   border: 2px solid #1c1915;
   border-top: 0;
   background: #f7f3ea;
@@ -458,6 +503,10 @@ tr.run td:nth-child(3) {
   .stats,
   .live {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .boards.compare {
+    grid-template-columns: 1fr;
   }
 
   .live div:nth-child(n + 3) {

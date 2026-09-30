@@ -50,8 +50,13 @@ function broadcast(payload: unknown) {
 
 interface PlayRequest {
   policy: PolicyName;
+  against: PolicyName | null;
   seconds: number;
   seed: number;
+}
+
+function isPolicy(value: unknown): value is PolicyName {
+  return value === "jev" || value === "laya" || value === "heuristic";
 }
 
 function parsePlayRequest(body: string, fallbackPolicy: PolicyName): PlayRequest | { error: string } {
@@ -69,8 +74,15 @@ function parsePlayRequest(body: string, fallbackPolicy: PolicyName): PlayRequest
   }
 
   const policy = raw.policy ?? fallbackPolicy;
-  if (policy !== "jev" && policy !== "laya" && policy !== "heuristic") {
+  if (!isPolicy(policy)) {
     return { error: "Policy must be jev, laya, or heuristic." };
+  }
+  let against: PolicyName | null = null;
+  if (raw.against !== undefined && raw.against !== null && raw.against !== "") {
+    if (!isPolicy(raw.against)) {
+      return { error: "Versus must be jev, laya, heuristic, or none." };
+    }
+    if (raw.against !== policy) against = raw.against;
   }
   const seconds = Number(raw.seconds ?? 20);
   const seed = Number(raw.seed ?? 7);
@@ -80,7 +92,7 @@ function parsePlayRequest(body: string, fallbackPolicy: PolicyName): PlayRequest
   if (!Number.isInteger(seed) || seed < 0 || seed > 1_000_000) {
     return { error: "Seed must be a whole number from 0 to 1000000." };
   }
-  return { policy, seconds, seed };
+  return { policy, against, seconds, seed };
 }
 
 function readBody(request: IncomingMessage): Promise<string> {
@@ -104,41 +116,48 @@ function readBody(request: IncomingMessage): Promise<string> {
 async function startRun(settings: PlayRequest) {
   const token = ++generation;
   running = true;
-  const { policy: policyName, seed, seconds } = settings;
+  const { policy: policyName, against, seed, seconds } = settings;
+  const sides: Array<{ side: "a" | "b"; policy: PolicyName }> = [{ side: "a", policy: policyName }];
+  if (against) sides.push({ side: "b", policy: against });
   const keyNote =
-    policyName === "heuristic" && !process.env.TYPESAFE_API_KEY
+    !against && policyName === "heuristic" && !process.env.TYPESAFE_API_KEY
       ? " TYPESAFE_API_KEY is not set, so this run is the local heuristic instead of Jev."
       : "";
   broadcast({
     type: "status",
-    message: `Playing with ${policyName} for ${seconds}s, seed ${seed}.${keyNote}`,
+    message: against
+      ? `Same course. ${policyName} and ${against}, ${seconds}s, seed ${seed}.`
+      : `Playing with ${policyName} for ${seconds}s, seed ${seed}.${keyNote}`,
     policy: policyName,
+    against,
     seconds,
     seed,
   });
 
-  try {
-    const summary = await play({
-      policy: createPolicy(policyName),
-      seed,
-      seconds,
-      frameStride: 2,
-      onDecision: (event) => {
-        if (token !== generation) return;
-        broadcast({ type: "decision", decision: event });
-      },
-      onFrame: (frame: FrameEvent) => {
-        if (token !== generation) return;
-        broadcast({ type: "frame", frame });
-      },
-    });
-    if (token === generation) broadcast({ type: "done", summary: summary satisfies PlaySummary });
-  } catch (caught) {
-    const message = explainFailure(policyName, caught);
-    if (token === generation) broadcast({ type: "error", message });
-  } finally {
-    if (token === generation) running = false;
-  }
+  await Promise.all(
+    sides.map(async ({ side, policy: name }) => {
+      try {
+        const summary = await play({
+          policy: createPolicy(name),
+          seed,
+          seconds,
+          frameStride: 2,
+          onDecision: (event) => {
+            if (token !== generation) return;
+            broadcast({ type: "decision", side, decision: event });
+          },
+          onFrame: (frame: FrameEvent) => {
+            if (token !== generation) return;
+            broadcast({ type: "frame", side, frame });
+          },
+        });
+        if (token === generation) broadcast({ type: "done", side, summary: summary satisfies PlaySummary });
+      } catch (caught) {
+        if (token === generation) broadcast({ type: "error", side, message: explainFailure(name, caught) });
+      }
+    }),
+  );
+  if (token === generation) running = false;
 }
 
 const server = createServer(async (request, response) => {
@@ -174,7 +193,7 @@ const server = createServer(async (request, response) => {
       response.end(JSON.stringify(parsed));
       return;
     }
-    const configError = policyConfigError(parsed.policy);
+    const configError = policyConfigError(parsed.policy) ?? (parsed.against ? policyConfigError(parsed.against) : null);
     if (configError) {
       response.writeHead(400, { "content-type": "application/json" });
       response.end(JSON.stringify({ error: configError }));
