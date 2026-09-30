@@ -7,6 +7,7 @@ import {
   step,
 } from "../game/engine.ts";
 import type { Action, Obstacle, World } from "../game/types.ts";
+import { explainFailure } from "../policy/errors.ts";
 import type { Decision, Policy } from "../policy/types.ts";
 
 export interface FrameEvent {
@@ -138,7 +139,7 @@ export async function play(options: PlayOptions): Promise<PlaySummary> {
       emit(false);
     }
   } catch (caught) {
-    error = caught instanceof Error ? caught.message : String(caught);
+    error = explainFailure(options.policy.name, caught);
     world.alive = false;
   }
 

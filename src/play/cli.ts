@@ -1,4 +1,5 @@
 import { loadLocalEnv } from "../config/env.ts";
+import { explainFailure } from "../policy/errors.ts";
 import { createPolicy, type PolicyName } from "../policy/create.ts";
 import { play } from "./session.ts";
 
@@ -28,9 +29,8 @@ const policy = (() => {
   try {
     return createPolicy(policyName);
   } catch (caught) {
-    const message = caught instanceof Error ? caught.message : String(caught);
+    const message = explainFailure(policyName, caught);
     console.error(message);
-    console.error("Set TYPESAFE_API_KEY, or run with --policy heuristic.");
     process.exit(1);
   }
 })();
@@ -47,4 +47,7 @@ const summary = await play({
 });
 
 console.log(JSON.stringify(summary, null, 2));
-if (summary.error) process.exitCode = 1;
+if (summary.error) {
+  console.error(summary.error);
+  process.exitCode = 1;
+}

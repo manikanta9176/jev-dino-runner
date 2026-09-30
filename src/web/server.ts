@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { explainFailure, policyConfigError, policyReady } from "../policy/errors.ts";
 import { createPolicy, type PolicyName } from "../policy/create.ts";
 import { play, type FrameEvent, type PlaySummary } from "../play/session.ts";
 import { loadLocalEnv } from "../config/env.ts";
@@ -133,7 +134,7 @@ async function startRun(settings: PlayRequest) {
     });
     if (token === generation) broadcast({ type: "done", summary: summary satisfies PlaySummary });
   } catch (caught) {
-    const message = caught instanceof Error ? caught.message : String(caught);
+    const message = explainFailure(policyName, caught);
     if (token === generation) broadcast({ type: "error", message });
   } finally {
     if (token === generation) running = false;
@@ -154,7 +155,8 @@ const server = createServer(async (request, response) => {
     writeEvent(response, {
       type: "hello",
       policy: policyFromEnv(),
-      hasApiKey: Boolean(process.env.TYPESAFE_API_KEY),
+      hasApiKey: Boolean(process.env.TYPESAFE_API_KEY?.trim()),
+      policies: policyReady(),
       running,
     });
     return;
@@ -170,6 +172,12 @@ const server = createServer(async (request, response) => {
     if ("error" in parsed) {
       response.writeHead(400, { "content-type": "application/json" });
       response.end(JSON.stringify(parsed));
+      return;
+    }
+    const configError = policyConfigError(parsed.policy);
+    if (configError) {
+      response.writeHead(400, { "content-type": "application/json" });
+      response.end(JSON.stringify({ error: configError }));
       return;
     }
     void startRun(parsed);

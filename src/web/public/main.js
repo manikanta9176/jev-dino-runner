@@ -18,6 +18,9 @@ const policyEl = document.querySelector("#policy");
 const actionEl = document.querySelector("#action");
 const confidenceEl = document.querySelector("#confidence");
 const statusEl = document.querySelector("#status");
+const notice = document.querySelector("#notice");
+const noticeTitle = document.querySelector("#notice-title");
+const noticeBody = document.querySelector("#notice-body");
 const reasonEl = document.querySelector("#reason");
 const playButton = document.querySelector("#play");
 const form = document.querySelector("#limits");
@@ -238,13 +241,75 @@ function paint(summary) {
 }
 
 function finish(summary) {
-  const ending = summary.survived ? "Survived the run." : "The run ended.";
-  const detail = summary.error ? ` ${summary.error}` : "";
-  statusEl.textContent = `${ending} Score ${summary.score}. ${summary.decisions} decisions.${detail}`;
+  setFormLocked(false);
   live = { ...summary, playing: false };
   paint(live);
-  setFormLocked(false);
+  if (summary.error) showNotice(summary.error);
+  else clearNotice();
+  const ending = summary.survived ? "Survived the run." : "The run ended.";
+  statusEl.classList.remove("problem");
+  statusEl.textContent = `${ending} Score ${summary.score}. ${summary.decisions} decisions.`;
 }
+
+let ready = { jev: true, laya: false, heuristic: true };
+
+const DEFAULT_STATUS =
+  "Set the limits, then press Play. A decision is made each time an obstacle gets close.";
+
+function noticeKind(message) {
+  if (/not configured/i.test(message)) return ["Not configured", "setup"];
+  if (/credit/i.test(message)) return ["Credits used up", "credits"];
+  if (/rate limit/i.test(message)) return ["Rate limit", "limit"];
+  if (/rejected the API key|refused this key/i.test(message)) return ["API key", "auth"];
+  if (/could not reach/i.test(message)) return ["Can't reach the API", "down"];
+  if (/whole number/i.test(message)) return ["Check the limits", "limit"];
+  return ["Couldn't play", "setup"];
+}
+
+function showNotice(message) {
+  const [title, kind] = noticeKind(message);
+  notice.hidden = false;
+  notice.dataset.kind = kind;
+  noticeTitle.textContent = title;
+  noticeBody.textContent = message;
+}
+
+function clearNotice() {
+  notice.hidden = true;
+  noticeTitle.textContent = "";
+  noticeBody.textContent = "";
+  statusEl.classList.remove("problem");
+}
+
+function statusIsWarning(text) {
+  return /not configured|credits left|rejected the API key|refused this key|rate limited|Could not reach|The run stopped|Couldn't play/i.test(
+    text,
+  );
+}
+
+function syncPolicyNotice() {
+  const problem = policyProblem(policyChoice.value);
+  if (problem) showNotice(problem);
+  else clearNotice();
+  statusEl.classList.remove("problem");
+  if (!problem || statusIsWarning(statusEl.textContent)) {
+    if (problem || statusIsWarning(statusEl.textContent)) statusEl.textContent = DEFAULT_STATUS;
+  }
+}
+
+function policyProblem(name) {
+  if (name === "jev" && !ready.jev) {
+    return "Jev is not configured. Add TYPESAFE_API_KEY to .env, then restart the server.";
+  }
+  if (name === "laya" && !ready.laya) {
+    return "Laya is not configured. Add LAYA_BASE_URL and LAYA_API_KEY to .env, then restart the server.";
+  }
+  return "";
+}
+
+policyChoice.addEventListener("change", () => {
+  syncPolicyNotice();
+});
 
 const events = new EventSource("/events");
 
@@ -256,16 +321,17 @@ events.addEventListener("message", (event) => {
     policyChoice.value = ["jev", "laya", "heuristic"].includes(message.policy)
       ? message.policy
       : "jev";
-    if (!message.hasApiKey) {
-      statusEl.textContent =
-        "No TYPESAFE_API_KEY in the environment. Choose heuristic, or add the key and restart the server to use Jev.";
-    }
+    if (message.policies) ready = message.policies;
+    else ready = { jev: Boolean(message.hasApiKey), laya: false, heuristic: true };
+    syncPolicyNotice();
     return;
   }
   if (message.type === "status") {
     queue.length = 0;
     policyName = message.policy;
     policyEl.textContent = policyName;
+    statusEl.classList.remove("problem");
+    clearNotice();
     statusEl.textContent = message.message;
     reasonEl.textContent = "";
     showMeter(null);
@@ -285,7 +351,9 @@ events.addEventListener("message", (event) => {
     return;
   }
   if (message.type === "error") {
-    statusEl.textContent = message.message;
+    showNotice(message.message);
+    statusEl.classList.remove("problem");
+    statusEl.textContent = "The run stopped.";
     setFormLocked(false);
     return;
   }
@@ -312,11 +380,18 @@ form.addEventListener("submit", async (event) => {
   const seconds = Number(secondsInput.value);
   const seed = Number(seedInput.value);
   if (!Number.isInteger(seconds) || seconds < 1 || seconds > 120) {
-    statusEl.textContent = "Seconds must be a whole number from 1 to 120.";
+    showNotice("Seconds must be a whole number from 1 to 120.");
     return;
   }
   if (!Number.isInteger(seed) || seed < 0 || seed > 1_000_000) {
-    statusEl.textContent = "Seed must be a whole number from 0 to 1000000.";
+    showNotice("Seed must be a whole number from 0 to 1000000.");
+    return;
+  }
+
+  const problem = policyProblem(policyChoice.value);
+  if (problem) {
+    showNotice(problem);
+    statusEl.textContent = DEFAULT_STATUS;
     return;
   }
 
@@ -325,6 +400,7 @@ form.addEventListener("submit", async (event) => {
   confidenceEl.textContent = "—";
   reasonEl.textContent = "";
   showMeter(null);
+  clearNotice();
   statusEl.textContent = "Starting…";
   livePanel.hidden = true;
   analysis.hidden = true;
@@ -340,7 +416,8 @@ form.addEventListener("submit", async (event) => {
   });
   if (!response.ok) {
     const payload = await response.json().catch(() => ({ error: "Could not start the run." }));
-    statusEl.textContent = payload.error ?? "Could not start the run.";
+    showNotice(payload.error ?? "Could not start the run.");
+    statusEl.textContent = "The run stopped.";
     setFormLocked(false);
   }
 });
