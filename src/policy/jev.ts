@@ -1,19 +1,25 @@
 import { choice, TypeSafeClient } from "@typesafe-ai/sdk";
-import { DINO_W, DINO_X } from "../game/constants.ts";
+import { DINO_W, DINO_X, DUCK_H, GROUND_Y, STAND_H } from "../game/constants.ts";
 import { nearestObstacle } from "../game/engine.ts";
-import { forecastAll } from "../game/forecast.ts";
 import type { Action, World } from "../game/types.ts";
 import type { Decision, Policy } from "./types.ts";
 
 const ACTIONS = ["jump", "duck", "run"] as const satisfies readonly Action[];
+
+/** Fixed meanings of the actions. These do not say which one is safe right now. */
+const ACTION_CRITERIA = {
+  run: "Keep the current path. Stay standing when on the ground. Do not jump and do not crouch.",
+  duck: "Crouch on the ground so the body becomes shorter. This does not leave the ground.",
+  jump: "Leap upward if currently on the ground. The body leaves the ground and stays in the air for a short time.",
+} as const;
 
 function round(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
 /**
- * Asks Jev for one Choice: jump, duck, or run.
- * The state includes a short physics forecast so the model is judging a concrete situation.
+ * Asks Jev which action fits the current scene.
+ * The state is measured geometry. The option text only defines what each action does.
  */
 export class JevPolicy implements Policy {
   readonly name = "jev";
@@ -25,39 +31,41 @@ export class JevPolicy implements Policy {
 
   async choose(world: World): Promise<Decision> {
     const threat = nearestObstacle(world);
-    const outlook = forecastAll(world);
+    const dinoRight = DINO_X + DINO_W;
     const state = {
       game: "dinosaur runner",
+      space: "X increases to the right. Y increases downward. Altitude is pixels above the ground.",
+      groundY: GROUND_Y,
       speedPxPerFrame: round(world.speed),
       dinosaur: {
+        frontX: dinoRight,
+        width: DINO_W,
+        standingHeight: STAND_H,
+        crouchingHeight: DUCK_H,
         altitudePx: round(world.dino.altitude),
-        ducking: world.dino.ducking,
         grounded: world.dino.altitude <= 0,
+        ducking: world.dino.ducking,
       },
       nextObstacle: threat
         ? {
             kind: threat.kind,
-            lane: threat.lane,
-            pixelsAhead: Math.round(threat.x - (DINO_X + DINO_W)),
+            leftX: Math.round(threat.x),
+            topY: threat.y,
             width: threat.w,
             height: threat.h,
+            bottomY: threat.y + threat.h,
+            pixelsAheadOfDinosaur: Math.round(threat.x - dinoRight),
           }
         : null,
-      ifYouActNow: {
-        run: outlook.run.summary,
-        duck: outlook.duck.summary,
-        jump: outlook.jump.summary,
-      },
     };
 
     const response = await this.client.systemOne({
       state,
       questions: {
-        action: choice("What should the dinosaur do on this frame?", {
-          run: outlook.run.summary,
-          duck: outlook.duck.summary,
-          jump: outlook.jump.summary,
-        }),
+        action: choice(
+          "Which action should the dinosaur take on this frame so its body does not overlap the next obstacle?",
+          ACTION_CRITERIA,
+        ),
       },
     });
 
@@ -73,7 +81,7 @@ export class JevPolicy implements Policy {
         run: answer.probabilities.run,
       },
       model: response.model,
-      note: outlook[picked].summary,
+      note: ACTION_CRITERIA[picked],
     };
   }
 }
