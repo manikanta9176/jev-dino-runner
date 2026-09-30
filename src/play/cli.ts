@@ -12,8 +12,8 @@ function readFlag(name: string): string | undefined {
 
 function readPolicy(): PolicyName {
   const value = readFlag("policy") ?? "jev";
-  if (value === "jev" || value === "heuristic") return value;
-  throw new Error(`Unknown policy "${value}". Use jev or heuristic.`);
+  if (value === "jev" || value === "laya" || value === "heuristic") return value;
+  throw new Error(`Unknown policy "${value}". Use jev, laya, or heuristic.`);
 }
 
 const seed = Number(readFlag("seed") ?? 7);

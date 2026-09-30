@@ -253,7 +253,9 @@ events.addEventListener("message", (event) => {
   if (message.type === "hello") {
     policyName = message.policy;
     policyEl.textContent = policyName;
-    policyChoice.value = message.policy === "heuristic" ? "heuristic" : "jev";
+    policyChoice.value = ["jev", "laya", "heuristic"].includes(message.policy)
+      ? message.policy
+      : "jev";
     if (!message.hasApiKey) {
       statusEl.textContent =
         "No TYPESAFE_API_KEY in the environment. Choose heuristic, or add the key and restart the server to use Jev.";

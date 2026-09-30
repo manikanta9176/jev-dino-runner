@@ -34,6 +34,7 @@ function policyFromEnv(): PolicyName {
     ? process.argv[process.argv.indexOf("--policy") + 1]
     : process.env.DINO_POLICY;
   if (requested === "heuristic") return "heuristic";
+  if (requested === "laya") return "laya";
   if (requested === "jev") return "jev";
   return process.env.TYPESAFE_API_KEY ? "jev" : "heuristic";
 }
@@ -67,8 +68,8 @@ function parsePlayRequest(body: string, fallbackPolicy: PolicyName): PlayRequest
   }
 
   const policy = raw.policy ?? fallbackPolicy;
-  if (policy !== "jev" && policy !== "heuristic") {
-    return { error: "Policy must be jev or heuristic." };
+  if (policy !== "jev" && policy !== "laya" && policy !== "heuristic") {
+    return { error: "Policy must be jev, laya, or heuristic." };
   }
   const seconds = Number(raw.seconds ?? 20);
   const seed = Number(raw.seed ?? 7);
