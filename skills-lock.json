@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "dflow-deploy": {
+      "source": "dflow-sh/skills",
+      "sourceType": "github",
+      "skillPath": "skills/dflow-deploy/SKILL.md",
+      "computedHash": "cff899cba775fc7eba25b5bfdbd3bbaafa770dcd6de211aa01d4f22368d0a736"
+    },
+    "dflow-mcp": {
+      "source": "dflow-sh/skills",
+      "sourceType": "github",
+      "skillPath": "skills/dflow-mcp/SKILL.md",
+      "computedHash": "a84f49d756c3f1a00f5c37d9c92701f97314aa71c6faa534d43e6adda73a6623"
+    }
+  }
+}
